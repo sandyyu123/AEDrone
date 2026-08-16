@@ -220,6 +220,13 @@
   var hasQrCoords = isFinite(qrLat) && isFinite(qrLng) &&
     Math.abs(qrLat) <= 90 && Math.abs(qrLng) <= 180;
 
+  // This page is only reached by scanning a station QR code, which always
+  // carries coordinates. Without them, send the visitor to the main site.
+  if (!hasQrCoords) {
+    location.replace('index.html');
+    return;
+  }
+
   var state = {
     source: null, // 'qr' | 'gps'
     lat: null, lng: null, accuracy: null,
@@ -478,9 +485,9 @@
     if (state.pathLine) { state.pathLine.remove(); state.pathLine = null; }
     state.request = null; state.drone = null;
     $('btn-cancel').style.display = '';
-    $('btn-locate').disabled = false;
-    $('btn-locate').textContent = 'Confirm my location';
-    show('stage-intro');
+    state.lat = qrLat; state.lng = qrLng; state.source = 'qr';
+    show('stage-confirm');
+    initConfirmMap();
     if (msg) notify(msg);
   }
 
