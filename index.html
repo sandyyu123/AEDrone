@@ -8,6 +8,7 @@
 <meta property="og:title" content="AEDrone — AED delivery by drone">
 <meta property="og:description" content="Tap the emergency button and the nearest available drone flies an AED directly to you.">
 <meta property="og:image" content="screen-home.png">
+<meta name="apple-itunes-app" content="app-id=6761315735">
 <link rel="icon" type="image/png" href="logo.png">
 <link rel="apple-touch-icon" href="logo.png">
 <style>
@@ -234,7 +235,7 @@
       <a href="#features">Features</a>
       <a href="#watch">Apple Watch</a>
       <a href="#tech">Technology</a>
-      <a class="nav-cta" href="https://apps.apple.com/us/app/aedrone/id6761315735">Download</a>
+      <a class="nav-cta" href="https://apps.apple.com/app/aedrone/id6761315735">Download</a>
     </div>
   </div>
 </nav>
@@ -250,7 +251,7 @@
         drone — and you never have to leave the patient's side.
       </p>
       <div class="hero-ctas">
-        <a class="appstore-badge" href="https://apps.apple.com/us/app/aedrone/id6761315735" aria-label="Download on the App Store">
+        <a class="appstore-badge" href="https://apps.apple.com/app/aedrone/id6761315735" aria-label="Download on the App Store">
           <svg width="180" height="60" viewBox="0 0 180 60" xmlns="http://www.w3.org/2000/svg" role="img">
             <rect width="180" height="60" rx="12" fill="#000"/>
             <rect x="0.5" y="0.5" width="179" height="59" rx="11.5" fill="none" stroke="#a6a6a6" stroke-width="1"/>
@@ -407,7 +408,7 @@
     <div class="cta-band">
       <h2>Get AEDrone on your iPhone</h2>
       <p>Free on the App Store, for iPhone, iPad, Mac, and Apple Vision.</p>
-      <a class="appstore-badge" href="https://apps.apple.com/us/app/aedrone/id6761315735" aria-label="Download on the App Store">
+      <a class="appstore-badge" href="https://apps.apple.com/app/aedrone/id6761315735" aria-label="Download on the App Store">
         <svg width="180" height="60" viewBox="0 0 180 60" xmlns="http://www.w3.org/2000/svg" role="img">
           <rect width="180" height="60" rx="12" fill="#000"/>
           <g fill="#fff">
@@ -438,6 +439,19 @@
     </div>
   </div>
 </footer>
+
+<script>
+  // apps.apple.com links carry no storefront code, so Apple geo-redirects each
+  // visitor to their own App Store. Chinese-language browsers are pinned to the
+  // mainland storefront explicitly, since geo-detection can bounce them to /us/.
+  (function () {
+    var lang = ((navigator.languages || [])[0] || navigator.language || '').toLowerCase();
+    if (lang.indexOf('zh') !== 0) return;
+    document.querySelectorAll('a[href*="apps.apple.com/app"]').forEach(function (a) {
+      a.href = a.href.replace('apps.apple.com/app', 'apps.apple.com/cn/app');
+    });
+  })();
+</script>
 
 </body>
 </html>
