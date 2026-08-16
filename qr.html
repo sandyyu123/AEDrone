@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AEDrone — Emergency AED request</title>
+<meta name="description" content="Confirm your location and request an AED delivered by drone. Demonstration system.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='8' y='8' width='84' height='84' fill='%23b8241d'/%3E%3Cpath d='M50 26v48M26 50h48' stroke='%23fff' stroke-width='14'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@500;600&family=Fira+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --red: #b8241d;
+    --red-bright: #d92b22;
+    --red-soft: #f4e6e4;
+    --ink: #17191c;
+    --ink-2: #464b51;
+    --ink-3: #75797f;
+    --paper: #f5f3ef;
+    --panel: #fdfcfa;
+    --line: #dcd7cf;
+    --line-2: #b9b3a8;
+    --ok: #2c6e49;
+    --serif: "IBM Plex Serif", Georgia, serif;
+    --sans: "Fira Sans", "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", Menlo, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--sans); color: var(--ink); background: var(--paper);
+    line-height: 1.5; font-size: 16.5px; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 0 18px 60px; }
+
+  header { border-bottom: 2px solid var(--ink); background: var(--paper); }
+  .head-inner { max-width: 560px; margin: 0 auto; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; }
+  .logo { display: flex; align-items: center; gap: 10px; font-family: var(--serif); font-weight: 600; font-size: 1.15rem; text-decoration: none; }
+  .logo-mark { width: 24px; height: 24px; background: var(--red); color: #fff; display: grid; place-items: center; font-family: var(--sans); font-size: .85rem; font-weight: 600; }
+  .m-label { font-family: var(--mono); font-size: .72rem; color: var(--ink-3); }
+  .m-label b { color: var(--red); font-weight: 500; }
+
+  .panel { position: relative; background: var(--panel); border: 1px solid var(--line-2); }
+  .panel::before {
+    content: ""; position: absolute; top: -9px; right: -9px; width: 17px; height: 17px;
+    background: var(--paper); border-bottom: 1px solid var(--line-2); transform: rotate(45deg);
+  }
+
+  h1 { font-family: var(--serif); font-weight: 600; font-size: 1.7rem; line-height: 1.15; letter-spacing: -.01em; margin: 26px 0 10px; }
+  .lede { color: var(--ink-2); font-size: .98rem; margin-bottom: 22px; }
+
+  .stage { display: none; }
+  .stage.active { display: block; }
+
+  .btn {
+    display: block; width: 100%; border: none; cursor: pointer; text-align: center;
+    font-family: var(--sans); font-weight: 600; font-size: 1.1rem;
+    padding: 18px; margin-top: 16px;
+    background: var(--red); color: #fff;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn:active { background: var(--red-bright); }
+  .btn[disabled] { background: var(--ink-3); cursor: default; }
+  .btn.secondary { background: transparent; color: var(--ink); border: 1.5px solid var(--ink); font-size: .95rem; padding: 13px; }
+  .btn.secondary:active { background: var(--ink); color: #fff; }
+
+  #map { height: 300px; border: 1px solid var(--line-2); background: #e8e6e1; }
+  .map-hint { margin-top: 8px; }
+
+  .datarow { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: .92rem; }
+  .datarow:last-child { border-bottom: none; }
+  .datarow .k { color: var(--ink-3); }
+  .datarow .v { font-family: var(--mono); font-size: .82rem; text-align: right; }
+
+  .card { padding: 18px 18px 14px; margin-top: 18px; }
+  .field { margin-top: 14px; }
+  .field label { display: block; font-family: var(--mono); font-size: .72rem; color: var(--ink-3); margin-bottom: 5px; }
+  .field input {
+    width: 100%; border: 1px solid var(--line-2); background: #fff; padding: 11px 12px;
+    font-family: var(--sans); font-size: 1rem; border-radius: 0; -webkit-appearance: none;
+  }
+  .field input:focus { outline: 2px solid var(--ink); outline-offset: -1px; }
+
+  /* status timeline */
+  .timeline { margin-top: 6px; }
+  .tstep { display: flex; gap: 14px; padding: 13px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+  .tstep:last-child { border-bottom: none; }
+  .tstep .dot { width: 10px; height: 10px; flex: none; background: var(--paper); border: 1.5px solid var(--line-2); align-self: center; }
+  .tstep.done .dot { background: var(--ok); border-color: var(--ok); }
+  .tstep.now .dot { background: var(--red); border-color: var(--red); animation: blink 1.2s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: .25; } }
+  .tstep .t-name { font-weight: 600; font-size: .98rem; }
+  .tstep.pending-style .t-name { color: var(--ink-3); font-weight: 500; }
+  .tstep .t-time { margin-left: auto; }
+
+  .bigstat { display: flex; align-items: baseline; gap: 10px; padding: 16px 0 4px; }
+  .bigstat b { font-family: var(--serif); font-weight: 600; font-size: 2.2rem; letter-spacing: -.01em; }
+
+  .notice {
+    margin-top: 18px; padding: 12px 15px; font-size: .88rem; line-height: 1.45;
+    background: var(--red-soft); color: var(--red); border-left: 3px solid var(--red);
+    display: none; word-break: break-word;
+  }
+  .notice.show { display: block; }
+
+  .demo-strip {
+    margin-top: 26px; padding-top: 14px; border-top: 1px solid var(--line);
+    font-size: .8rem; color: var(--ink-3); line-height: 1.5;
+  }
+  .demo-strip b { color: var(--red); font-weight: 600; }
+
+  .delivered-banner {
+    margin-top: 18px; padding: 18px; border: 2px solid var(--ok); color: var(--ok);
+    font-weight: 600; text-align: center; font-size: 1.05rem; display: none;
+  }
+  .delivered-banner.show { display: block; }
+
+  .leaflet-container { font-family: var(--sans); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="head-inner">
+    <span class="logo"><span class="logo-mark">✚</span> AEDrone</span>
+    <span class="m-label">demonstration<b> · live</b></span>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- Stage 1: intro / locate -->
+  <div class="stage active" id="stage-intro">
+    <h1>AED delivery by drone, to this spot.</h1>
+    <p class="lede">
+      This station is covered by an AEDrone demonstration. Confirm your location and a
+      drone can fly an automated external defibrillator directly to you.
+    </p>
+    <div class="card panel">
+      <div class="datarow"><span class="k">Drones ready nearby</span><span class="v drone-count">—</span></div>
+      <div class="datarow"><span class="k">System status</span><span class="v" id="sys-status">connecting…</span></div>
+    </div>
+    <button class="btn" id="btn-locate">Confirm my location</button>
+    <p class="m-label" style="margin-top:10px">your browser will ask for location permission</p>
+  </div>
+
+  <!-- Stage 2: confirm position + request -->
+  <div class="stage" id="stage-confirm">
+    <h1>Is this where the AED is needed?</h1>
+    <p class="lede" id="confirm-lede">The drone will land as close to the marked point as it can. Tap the map to adjust the point.</p>
+    <div id="map"></div>
+    <p class="map-hint m-label" id="fix-info">…</p>
+    <div class="card panel">
+      <div class="datarow"><span class="k">Drones ready nearby</span><span class="v drone-count">—</span></div>
+      <div class="field">
+        <label for="phone">phone number — optional</label>
+        <input id="phone" type="tel" inputmode="tel" placeholder="For the dispatcher to reach you">
+      </div>
+      <div class="field">
+        <label for="notes">notes for the operator — optional</label>
+        <input id="notes" type="text" placeholder="e.g. second floor courtyard, near the fountain">
+      </div>
+    </div>
+    <button class="btn" id="btn-request">Request emergency AED</button>
+    <p class="m-label" style="margin-top:10px">tapping submits a live request to the dispatch system</p>
+  </div>
+
+  <!-- Stage 3: active request -->
+  <div class="stage" id="stage-active">
+    <h1>Help is on the way.</h1>
+    <p class="lede">Stay with the patient. This page updates live as the drone approaches.</p>
+
+    <div id="map2" style="height:260px; border:1px solid var(--line-2); background:#e8e6e1;"></div>
+
+    <div class="bigstat"><b id="dist">—</b><span class="m-label" id="dist-label">drone distance</span></div>
+
+    <div class="card panel timeline">
+      <div class="tstep" id="ts-pending">
+        <span class="dot"></span><span class="t-name">Request received</span><span class="t-time m-label" id="tt-pending"></span>
+      </div>
+      <div class="tstep pending-style" id="ts-dispatched">
+        <span class="dot"></span><span class="t-name">Drone dispatched</span><span class="t-time m-label" id="tt-dispatched"></span>
+      </div>
+      <div class="tstep pending-style" id="ts-delivered">
+        <span class="dot"></span><span class="t-name">AED delivered</span><span class="t-time m-label" id="tt-delivered"></span>
+      </div>
+    </div>
+
+    <div class="delivered-banner" id="delivered-banner">
+      AED delivered — open the case and follow its voice instructions.
+    </div>
+
+    <button class="btn secondary" id="btn-cancel">Cancel request</button>
+    <p class="m-label" style="margin-top:10px">request <span id="req-id-label">—</span></p>
+  </div>
+
+  <div class="notice" id="notice"></div>
+
+  <div class="demo-strip">
+    <b>Demonstration system.</b> This page is part of an AEDrone research demo and is not a
+    real emergency service. In a real emergency, always call your local emergency number
+    (911 in the US) first.
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+(function () {
+  var SUPABASE_URL = 'https://tgqmtqssrdeoztzvswgv.supabase.co';
+  var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRncW10cXNzcmRlb3p0enZzd2d2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE5OTg5MjMsImV4cCI6MjA3NzU3NDkyM30.s4r8ZJRHjH4-KvXxeSFm9gvTO_y8Niqrvh4Yrf3leLA';
+
+  var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // QR codes encode the station's position in the URL, e.g. ?lat=34.0522&lng=-118.2437&station=Main+Gate
+  var qp = new URLSearchParams(location.search);
+  var qrLat = parseFloat(qp.get('lat')), qrLng = parseFloat(qp.get('lng'));
+  var qrStation = (qp.get('station') || '').trim();
+  var hasQrCoords = isFinite(qrLat) && isFinite(qrLng) &&
+    Math.abs(qrLat) <= 90 && Math.abs(qrLng) <= 180;
+
+  var state = {
+    source: null, // 'qr' | 'gps'
+    lat: null, lng: null, accuracy: null,
+    request: null,
+    drone: null,
+    map: null, map2: null, userMarker: null, userMarker2: null, droneMarker: null, pathLine: null,
+    reqChannel: null, droneChannel: null
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function show(stageId) {
+    ['stage-intro', 'stage-confirm', 'stage-active'].forEach(function (s) {
+      $(s).classList.toggle('active', s === stageId);
+    });
+  }
+  function notify(msg) {
+    var n = $('notice');
+    if (!msg) { n.classList.remove('show'); n.textContent = ''; return; }
+    n.textContent = msg; n.classList.add('show');
+  }
+  function fmtTime(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+  function haversine(lat1, lon1, lat2, lon2) {
+    var R = 6371000, toRad = Math.PI / 180;
+    var dLat = (lat2 - lat1) * toRad, dLon = (lon2 - lon1) * toRad;
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+  function fmtDist(m) {
+    if (m == null) return '—';
+    return m >= 1000 ? (m / 1000).toFixed(2) + ' km' : Math.round(m) + ' m';
+  }
+
+  var userIcon = L.divIcon({ className: '', iconSize: [18, 18], iconAnchor: [9, 9],
+    html: '<div style="width:18px;height:18px;background:#b8241d;border:2.5px solid #fff;border-radius:50%;box-sizing:border-box"></div>' });
+  var droneIcon = L.divIcon({ className: '', iconSize: [20, 20], iconAnchor: [10, 10],
+    html: '<div style="width:20px;height:20px;background:#17191c;color:#fff;font:600 11px sans-serif;display:flex;align-items:center;justify-content:center">✕</div>' });
+
+  function addTiles(map) {
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '© OpenStreetMap'
+    }).addTo(map);
+  }
+
+  // ---------- boot: anonymous session + system status ----------
+  async function ensureSession() {
+    var s = await sb.auth.getSession();
+    if (s.data.session) return s.data.session;
+    var r = await sb.auth.signInAnonymously();
+    if (r.error) throw new Error('Sign-in failed: ' + r.error.message +
+      ' — enable "Allow anonymous sign-ins" under Authentication in the Supabase dashboard.');
+    return r.data.session;
+  }
+
+  async function boot() {
+    // The QR coordinates are self-contained — show the confirm map immediately,
+    // before (and regardless of) the backend connection.
+    if (hasQrCoords) {
+      state.lat = qrLat; state.lng = qrLng; state.source = 'qr';
+      $('confirm-lede').textContent = 'This QR station is registered at the marked point' +
+        (qrStation ? ' (' + qrStation + ')' : '') +
+        '. The drone will land as close to it as it can — tap the map if the emergency is somewhere else nearby.';
+      show('stage-confirm');
+      initConfirmMap();
+    }
+    try {
+      await ensureSession();
+      $('sys-status').textContent = 'online';
+      var d = await sb.from('drones').select('id', { count: 'exact', head: true }).eq('status', 'ready');
+      var count = (d.count == null) ? '—' : String(d.count);
+      document.querySelectorAll('.drone-count').forEach(function (el) { el.textContent = count; });
+      // resume an active request from a previous scan/refresh
+      var uid = (await sb.auth.getUser()).data.user.id;
+      var act = await sb.from('emergency_requests').select('*').eq('user_id', uid)
+        .in('status', ['pending', 'dispatched']).order('created_at', { ascending: false }).limit(1);
+      if (act.data && act.data.length) {
+        state.request = act.data[0];
+        state.lat = state.request.latitude; state.lng = state.request.longitude;
+        enterActiveStage();
+      }
+    } catch (e) {
+      $('sys-status').textContent = 'offline';
+      notify(e.message || String(e));
+    }
+  }
+
+  // ---------- stage 1 → 2: geolocate ----------
+  $('btn-locate').addEventListener('click', function () {
+    notify('');
+    if (!navigator.geolocation) { notify('This browser does not support geolocation.'); return; }
+    $('btn-locate').disabled = true;
+    $('btn-locate').textContent = 'Locating…';
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      state.lat = pos.coords.latitude;
+      state.lng = pos.coords.longitude;
+      state.accuracy = pos.coords.accuracy;
+      state.source = 'gps';
+      show('stage-confirm');
+      initConfirmMap();
+    }, function (err) {
+      $('btn-locate').disabled = false;
+      $('btn-locate').textContent = 'Confirm my location';
+      notify('Could not get your location: ' + err.message +
+        (location.protocol === 'http:' ? ' (geolocation requires HTTPS)' : ''));
+    }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
+  });
+
+  function initConfirmMap() {
+    if (!state.map) {
+      state.map = L.map('map', { zoomControl: true });
+      addTiles(state.map);
+      state.map.on('click', function (e) {
+        state.lat = e.latlng.lat; state.lng = e.latlng.lng;
+        state.userMarker.setLatLng(e.latlng);
+        updateFixInfo('adjusted by hand');
+      });
+    }
+    state.map.setView([state.lat, state.lng], 17);
+    if (state.userMarker) state.userMarker.remove();
+    state.userMarker = L.marker([state.lat, state.lng], { icon: userIcon }).addTo(state.map);
+    updateFixInfo(null);
+  }
+  function updateFixInfo(suffix) {
+    var tail;
+    if (suffix) tail = suffix;
+    else if (state.source === 'qr') tail = 'location from qr code' + (qrStation ? ' · ' + qrStation : '');
+    else tail = state.accuracy ? 'gps accuracy ±' + Math.round(state.accuracy) + ' m' : '';
+    $('fix-info').textContent = state.lat.toFixed(6) + ', ' + state.lng.toFixed(6) + (tail ? ' — ' + tail : '');
+  }
+
+  // ---------- stage 2 → 3: submit request ----------
+  $('btn-request').addEventListener('click', async function () {
+    notify('');
+    var btn = $('btn-request');
+    if (btn.dataset.armed !== '1') {
+      btn.dataset.armed = '1';
+      btn.textContent = 'Tap again to confirm';
+      setTimeout(function () { btn.dataset.armed = '0'; btn.textContent = 'Request emergency AED'; }, 4000);
+      return;
+    }
+    btn.disabled = true; btn.textContent = 'Submitting…';
+    try {
+      var uid = (await sb.auth.getUser()).data.user.id;
+      var row = {
+        user_id: uid,
+        latitude: state.lat,
+        longitude: state.lng,
+        status: 'pending',
+        urgent_notes: $('notes').value.trim() || null,
+        phone_number: $('phone').value.trim() || null
+      };
+      var r = await sb.from('emergency_requests').insert(row).select().single();
+      if (r.error) throw r.error;
+      state.request = r.data;
+      enterActiveStage();
+    } catch (e) {
+      notify('Request failed: ' + (e.message || e));
+    } finally {
+      btn.disabled = false; btn.dataset.armed = '0'; btn.textContent = 'Request emergency AED';
+    }
+  });
+
+  // ---------- stage 3: live tracking ----------
+  function enterActiveStage() {
+    show('stage-active');
+    $('req-id-label').textContent = String(state.request.id).slice(0, 8);
+    if (!state.map2) {
+      state.map2 = L.map('map2', { zoomControl: false });
+      addTiles(state.map2);
+    }
+    state.map2.setView([state.request.latitude, state.request.longitude], 16);
+    if (state.userMarker2) state.userMarker2.remove();
+    state.userMarker2 = L.marker([state.request.latitude, state.request.longitude], { icon: userIcon }).addTo(state.map2);
+    renderStatus();
+    subscribeRequest();
+    if (state.request.assigned_drone_id) watchDrone(state.request.assigned_drone_id);
+  }
+
+  function renderStatus() {
+    var req = state.request;
+    var order = ['pending', 'dispatched', 'delivered'];
+    var pos = req.status === 'delivered' ? 2 : (req.status === 'dispatched' ? 1 : 0);
+    [['ts-pending', 'tt-pending', req.created_at],
+     ['ts-dispatched', 'tt-dispatched', req.dispatched_at],
+     ['ts-delivered', 'tt-delivered', req.delivered_at]].forEach(function (t, i) {
+      var el = $(t[0]);
+      el.classList.remove('done', 'now', 'pending-style');
+      if (i < pos || req.status === 'delivered' && i === 2) el.classList.add('done');
+      else if (i === pos) el.classList.add(req.status === 'delivered' ? 'done' : 'now');
+      else el.classList.add('pending-style');
+      $(t[1]).textContent = fmtTime(t[2]);
+    });
+    $('delivered-banner').classList.toggle('show', req.status === 'delivered');
+    if (req.status === 'delivered') {
+      $('btn-cancel').style.display = 'none';
+      $('dist-label').textContent = 'delivered at your location';
+    }
+    if (req.status === 'cancelled') resetToStart('Request cancelled.');
+  }
+
+  function subscribeRequest() {
+    if (state.reqChannel) sb.removeChannel(state.reqChannel);
+    state.reqChannel = sb.channel('req-' + state.request.id)
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'emergency_requests', filter: 'id=eq.' + state.request.id },
+        function (payload) {
+          state.request = payload.new;
+          renderStatus();
+          if (payload.new.assigned_drone_id) watchDrone(payload.new.assigned_drone_id);
+        })
+      .subscribe();
+  }
+
+  async function watchDrone(droneId) {
+    if (state.droneChannel) return; // already watching
+    var d = await sb.from('drones').select('*').eq('id', droneId).single();
+    if (d.data) updateDrone(d.data);
+    state.droneChannel = sb.channel('drone-' + droneId)
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'drones', filter: 'id=eq.' + droneId },
+        function (payload) { updateDrone(payload.new); })
+      .subscribe();
+  }
+
+  function updateDrone(drone) {
+    state.drone = drone;
+    var dl = [drone.latitude, drone.longitude];
+    var ul = [state.request.latitude, state.request.longitude];
+    if (!state.droneMarker) state.droneMarker = L.marker(dl, { icon: droneIcon }).addTo(state.map2);
+    else state.droneMarker.setLatLng(dl);
+    if (!state.pathLine) state.pathLine = L.polyline([dl, ul], { color: '#17191c', weight: 1.5, dashArray: '5 6' }).addTo(state.map2);
+    else state.pathLine.setLatLngs([dl, ul]);
+    state.map2.fitBounds(L.latLngBounds([dl, ul]).pad(0.25));
+    if (state.request.status !== 'delivered') {
+      $('dist').textContent = fmtDist(haversine(dl[0], dl[1], ul[0], ul[1]));
+      $('dist-label').textContent = 'drone distance · live';
+    }
+  }
+
+  // ---------- cancel / reset ----------
+  $('btn-cancel').addEventListener('click', async function () {
+    if (!state.request) return;
+    var r = await sb.from('emergency_requests').update({ status: 'cancelled' }).eq('id', state.request.id).select();
+    if (r.error) { notify('Cancel failed: ' + r.error.message); return; }
+    resetToStart('Request cancelled.');
+  });
+
+  function resetToStart(msg) {
+    if (state.reqChannel) { sb.removeChannel(state.reqChannel); state.reqChannel = null; }
+    if (state.droneChannel) { sb.removeChannel(state.droneChannel); state.droneChannel = null; }
+    if (state.droneMarker) { state.droneMarker.remove(); state.droneMarker = null; }
+    if (state.pathLine) { state.pathLine.remove(); state.pathLine = null; }
+    state.request = null; state.drone = null;
+    $('btn-cancel').style.display = '';
+    $('btn-locate').disabled = false;
+    $('btn-locate').textContent = 'Confirm my location';
+    show('stage-intro');
+    if (msg) notify(msg);
+  }
+
+  boot();
+})();
+</script>
+
+</body>
+</html>
